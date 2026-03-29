@@ -270,6 +270,46 @@ func (s Service) SetGroupID(ctx context.Context, req *authd.SetGroupIDRequest) (
 	}, nil
 }
 
+// DeleteUser removes the user with the given name from the authd database.
+func (s Service) DeleteUser(ctx context.Context, req *authd.DeleteUserRequest) (*authd.Empty, error) {
+	if err := s.permissionManager.CheckRequestIsFromRoot(ctx); err != nil {
+		return nil, status.Error(codes.PermissionDenied, err.Error())
+	}
+
+	// authd uses lowercase usernames.
+	name := strings.ToLower(req.GetName())
+	if name == "" {
+		return nil, status.Error(codes.InvalidArgument, "no user name provided")
+	}
+
+	if err := s.userManager.DeleteUser(name); err != nil {
+		log.Errorf(ctx, "DeleteUser: %v", err)
+		return nil, grpcError(err)
+	}
+
+	return &authd.Empty{}, nil
+}
+
+// DeleteGroup removes the group with the given name from the authd database.
+func (s Service) DeleteGroup(ctx context.Context, req *authd.DeleteGroupRequest) (*authd.Empty, error) {
+	if err := s.permissionManager.CheckRequestIsFromRoot(ctx); err != nil {
+		return nil, status.Error(codes.PermissionDenied, err.Error())
+	}
+
+	// authd uses lowercase group names.
+	name := strings.ToLower(req.GetName())
+	if name == "" {
+		return nil, status.Error(codes.InvalidArgument, "no group name provided")
+	}
+
+	if err := s.userManager.DeleteGroup(name); err != nil {
+		log.Errorf(ctx, "DeleteGroup: %v", err)
+		return nil, grpcError(err)
+	}
+
+	return &authd.Empty{}, nil
+}
+
 // userToProtobuf converts a types.UserEntry to authd.User.
 func userToProtobuf(u types.UserEntry) *authd.User {
 	return &authd.User{

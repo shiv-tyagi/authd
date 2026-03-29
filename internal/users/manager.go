@@ -702,6 +702,47 @@ func (m *Manager) UnlockUser(username string) error {
 	return nil
 }
 
+// DeleteUser removes the user with the given name from the database.
+func (m *Manager) DeleteUser(username string) error {
+	m.userManagementMu.Lock()
+	defer m.userManagementMu.Unlock()
+
+	userRow, err := m.db.UserByName(username)
+	if err != nil {
+		return err
+	}
+
+	lockedEntries, unlockEntries, err := localentries.WithUserDBLock()
+	if err != nil {
+		return err
+	}
+	defer func() { err = errors.Join(err, unlockEntries()) }()
+
+	// Remove the user from any local groups they are a member of.
+	_, _, localGroups, err := m.db.UserWithGroups(username)
+	if err != nil {
+		return err
+	}
+	if err := localentries.UpdateGroups(lockedEntries, username, nil, localGroups); err != nil {
+		return err
+	}
+
+	return m.db.DeleteUser(userRow.UID)
+}
+
+// DeleteGroup removes the group with the given name from the database.
+func (m *Manager) DeleteGroup(groupname string) error {
+	m.userManagementMu.Lock()
+	defer m.userManagementMu.Unlock()
+
+	groupRow, err := m.db.GroupByName(groupname)
+	if err != nil {
+		return err
+	}
+
+	return m.db.DeleteGroup(groupRow.GID)
+}
+
 // IsUserLocked returns true if the user with the given user name is locked, false otherwise.
 func (m *Manager) IsUserLocked(username string) (bool, error) {
 	u, err := m.db.UserByName(username)
