@@ -17,7 +17,9 @@ import (
 const warningMessage = `
 WARNING: Deleting a user that still owns files on the filesystem can lead to
 security issues. Any existing files owned by this user's UID may become
-accessible to a different user that is later assigned the same UID.
+accessible to a different user that is later assigned the same UID. If the
+user is later re-created, they may be assigned a new UID, breaking ownership
+of their existing home directory and files.
 
 If you only want to prevent the user from logging in, consider using
 'authctl user lock' instead. A locked user retains their UID, ensuring

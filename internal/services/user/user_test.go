@@ -476,12 +476,13 @@ func TestDeleteGroup(t *testing.T) {
 
 		wantErr bool
 	}{
-		"Successfully_delete_group":                {groupname: "group1"},
-		"Successfully_delete_group_with_uppercase": {groupname: "GROUP1"},
+		"Successfully_delete_group":                {groupname: "commongroup"},
+		"Successfully_delete_group_with_uppercase": {groupname: "COMMONGROUP"},
 
-		"Error_when_groupname_is_empty":   {wantErr: true},
-		"Error_when_group_does_not_exist": {groupname: "doesnotexist", wantErr: true},
-		"Error_when_not_root":             {groupname: "group1", currentUserNotRoot: true, wantErr: true},
+		"Error_when_groupname_is_empty":                         {wantErr: true},
+		"Error_when_group_does_not_exist":                       {groupname: "doesnotexist", wantErr: true},
+		"Error_when_not_root":                                   {groupname: "commongroup", currentUserNotRoot: true, wantErr: true},
+		"Error_when_group_is_primary_group_of_an_existing_user": {groupname: "group1", wantErr: true},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {

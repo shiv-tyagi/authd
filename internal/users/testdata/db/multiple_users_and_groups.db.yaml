@@ -44,9 +44,14 @@ groups:
     - name: commongroup
       gid: 99999
       ugid: "87654321"
+    - name: nonprimarygroup
+      gid: 88888
+      ugid: "88888888"
 users_to_groups:
     - uid: 1111
       gid: 11111
+    - uid: 1111
+      gid: 88888
     - uid: 1111
       gid: 99999
     - uid: 2222

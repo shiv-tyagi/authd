@@ -10,6 +10,7 @@ import (
 	"os/user"
 	"slices"
 	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 
@@ -732,6 +733,11 @@ func (m *Manager) DeleteUser(username string, removeHome bool) error {
 		return err
 	}
 
+	// Delete the user's primary group
+	if err := m.db.DeleteGroup(userRow.GID); err != nil {
+		return fmt.Errorf("failed to delete primary group for user %q: %w", username, err)
+	}
+
 	if removeHome && userRow.Dir != "" {
 		if err := os.RemoveAll(userRow.Dir); err != nil {
 			return fmt.Errorf("failed to remove home directory %q for user %q: %w", userRow.Dir, username, err)
@@ -749,6 +755,19 @@ func (m *Manager) DeleteGroup(groupname string) error {
 	groupRow, err := m.db.GroupByName(groupname)
 	if err != nil {
 		return err
+	}
+
+	// Do not allow deletion of a group that is the primary group of any existing user.
+	primaryUsers, err := m.db.UsersWithPrimaryGroup(groupRow.GID)
+	if err != nil {
+		return fmt.Errorf("failed to check for users with primary group %q: %w", groupname, err)
+	}
+	if len(primaryUsers) > 0 {
+		names := make([]string, 0, len(primaryUsers))
+		for _, u := range primaryUsers {
+			names = append(names, u.Name)
+		}
+		return fmt.Errorf("group %q is the primary group of user(s): %s", groupname, strings.Join(names, ", "))
 	}
 
 	return m.db.DeleteGroup(groupRow.GID)

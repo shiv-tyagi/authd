@@ -21,9 +21,6 @@ users:
       shell: /bin/bash
       broker_id: "1902181170"
 groups:
-    - name: group1
-      gid: 11111
-      ugid: group1
     - name: group2
       gid: 22222
       ugid: group2

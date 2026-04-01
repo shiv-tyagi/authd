@@ -29,6 +29,9 @@ users:
       dir: /home/userwithoutbroker@example.com
       shell: /bin/sh
 groups:
+    - name: group1
+      gid: 11111
+      ugid: "12345678"
     - name: group2withoutugid
       gid: 22222
       ugid: ""
@@ -42,6 +45,8 @@ groups:
       gid: 99999
       ugid: "87654321"
 users_to_groups:
+    - uid: 1111
+      gid: 11111
     - uid: 1111
       gid: 99999
     - uid: 2222

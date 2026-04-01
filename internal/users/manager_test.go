@@ -876,10 +876,11 @@ func TestDeleteGroup(t *testing.T) {
 		wantErr     bool
 		wantErrType error
 	}{
-		"Successfully_delete_group_keeps_its_members_in_the_db":       {groupname: "group1", dbFile: "multiple_users_and_groups"},
+		"Successfully_delete_group_keeps_its_members_in_the_db":       {groupname: "nonprimarygroup", dbFile: "multiple_users_and_groups"},
 		"Successfully_delete_shared_group_leaves_other_groups_intact": {groupname: "commongroup", dbFile: "multiple_users_and_groups"},
 
-		"Error_if_group_does_not_exist": {groupname: "doesnotexist", dbFile: "multiple_users_and_groups", wantErrType: db.NoDataFoundError{}},
+		"Error_if_group_does_not_exist":                       {groupname: "doesnotexist", dbFile: "multiple_users_and_groups", wantErrType: db.NoDataFoundError{}},
+		"Error_if_group_is_primary_group_of_an_existing_user": {groupname: "group1", dbFile: "multiple_users_and_groups", wantErr: true},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
