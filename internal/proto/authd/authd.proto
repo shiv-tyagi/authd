@@ -164,6 +164,8 @@ message UnlockUserRequest{
 
 message DeleteUserRequest{
   string name = 1;
+  // If true, remove the user's home directory.
+  bool remove_home = 2;
 }
 
 message DeleteGroupRequest{

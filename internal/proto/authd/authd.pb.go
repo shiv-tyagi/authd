@@ -1082,8 +1082,10 @@ func (x *UnlockUserRequest) GetName() string {
 }
 
 type DeleteUserRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Name  string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// If true, remove the user's home directory.
+	RemoveHome    bool `protobuf:"varint,2,opt,name=remove_home,json=removeHome,proto3" json:"remove_home,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1123,6 +1125,13 @@ func (x *DeleteUserRequest) GetName() string {
 		return x.Name
 	}
 	return ""
+}
+
+func (x *DeleteUserRequest) GetRemoveHome() bool {
+	if x != nil {
+		return x.RemoveHome
+	}
+	return false
 }
 
 type DeleteGroupRequest struct {
@@ -2064,9 +2073,11 @@ const file_authd_proto_rawDesc = "" +
 	"\x0fLockUserRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\"'\n" +
 	"\x11UnlockUserRequest\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\"'\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\"H\n" +
 	"\x11DeleteUserRequest\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\"(\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1f\n" +
+	"\vremove_home\x18\x02 \x01(\bR\n" +
+	"removeHome\"(\n" +
 	"\x12DeleteGroupRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\"+\n" +
 	"\x15GetGroupByNameRequest\x12\x12\n" +

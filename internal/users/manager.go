@@ -703,7 +703,8 @@ func (m *Manager) UnlockUser(username string) error {
 }
 
 // DeleteUser removes the user with the given name from the database.
-func (m *Manager) DeleteUser(username string) error {
+// If removeHome is true, the user's home directory is also removed.
+func (m *Manager) DeleteUser(username string, removeHome bool) error {
 	m.userManagementMu.Lock()
 	defer m.userManagementMu.Unlock()
 
@@ -727,7 +728,17 @@ func (m *Manager) DeleteUser(username string) error {
 		return err
 	}
 
-	return m.db.DeleteUser(userRow.UID)
+	if err := m.db.DeleteUser(userRow.UID); err != nil {
+		return err
+	}
+
+	if removeHome && userRow.Dir != "" {
+		if err := os.RemoveAll(userRow.Dir); err != nil {
+			return fmt.Errorf("failed to remove home directory %q for user %q: %w", userRow.Dir, username, err)
+		}
+	}
+
+	return nil
 }
 
 // DeleteGroup removes the group with the given name from the database.

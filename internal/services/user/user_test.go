@@ -425,8 +425,7 @@ func TestSetGroupID(t *testing.T) {
 
 func TestDeleteUser(t *testing.T) {
 	tests := map[string]struct {
-		sourceDB string
-
+		sourceDB           string
 		username           string
 		currentUserNotRoot bool
 
@@ -435,9 +434,11 @@ func TestDeleteUser(t *testing.T) {
 		"Successfully_delete_user":                {username: "user1@example.com"},
 		"Successfully_delete_user_with_uppercase": {username: "USER1@EXAMPLE.COM"},
 
-		"Error_when_username_is_empty":   {wantErr: true},
-		"Error_when_user_does_not_exist": {username: "doesnotexist@example.com", wantErr: true},
-		"Error_when_not_root":            {username: "user1@example.com", currentUserNotRoot: true, wantErr: true},
+		"Error_when_username_is_empty":      {wantErr: true},
+		"Error_when_user_does_not_exist":    {username: "doesnotexist@example.com", wantErr: true},
+		"Error_when_not_root":               {username: "user1@example.com", currentUserNotRoot: true, wantErr: true},
+		"Error_when_broker_fails_to_delete": {username: "delete_error@example.com", wantErr: true},
+		"Error_when_broker_not_found":       {sourceDB: "default.db.yaml", username: "user1@example.com", wantErr: true},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -445,7 +446,12 @@ func TestDeleteUser(t *testing.T) {
 				userslocking.Z_ForTests_OverrideLockingWithCleanup(t)
 			}
 
-			client, m := newUserServiceClient(t, tc.sourceDB, tc.currentUserNotRoot)
+			dbFile := tc.sourceDB
+			if dbFile == "" {
+				dbFile = "delete-user.db.yaml"
+			}
+
+			client, m := newUserServiceClient(t, dbFile, tc.currentUserNotRoot)
 
 			_, err := client.DeleteUser(context.Background(), &authd.DeleteUserRequest{Name: tc.username})
 			if tc.wantErr {

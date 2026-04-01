@@ -282,9 +282,32 @@ func (s Service) DeleteUser(ctx context.Context, req *authd.DeleteUserRequest) (
 		return nil, status.Error(codes.InvalidArgument, "no user name provided")
 	}
 
-	if err := s.userManager.DeleteUser(name); err != nil {
+	// Look up which broker owns this user before removing them from the DB.
+	brokerID, err := s.userManager.BrokerForUser(name)
+	if err != nil {
+		log.Errorf(ctx, "DeleteUser: could not determine broker for user %q: %v", name, err)
+		return nil, grpcError(err)
+	}
+
+	if err := s.userManager.DeleteUser(name, req.GetRemoveHome()); err != nil {
 		log.Errorf(ctx, "DeleteUser: %v", err)
 		return nil, grpcError(err)
+	}
+
+	// Notify the broker so it can clean up any broker side data (tokens, cached
+	// passwords, etc.) stored for this user. We do this after the DB-side user deletion
+	// so that a broker side failure does not leave the user dangling in the DB.
+	// The local broker has no remote data, so skip it.
+	if brokerID != "" && brokerID != brokers.LocalBrokerName {
+		broker, err := s.brokerManager.BrokerFromID(brokerID)
+		if err != nil {
+			log.Errorf(ctx, "DeleteUser: could not find broker %q for user %q: %v", brokerID, name, err)
+			return nil, grpcError(err)
+		}
+		if err := broker.DeleteUser(ctx, name); err != nil {
+			log.Errorf(ctx, "DeleteUser: broker side cleanup for user %q failed: %v", name, err)
+			return nil, grpcError(err)
+		}
 	}
 
 	return &authd.Empty{}, nil

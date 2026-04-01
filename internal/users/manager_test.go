@@ -798,18 +798,19 @@ func TestUpdateBrokerForUser(t *testing.T) {
 func TestDeleteUser(t *testing.T) {
 	tests := map[string]struct {
 		username string
-		dbFile   string
 
 		localGroupsFile string
+		removeHome      bool
 
 		wantErr     bool
 		wantErrType error
 	}{
-		"Successfully_delete_user":                                   {dbFile: "multiple_users_and_groups"},
-		"Successfully_delete_user_removes_them_from_local_groups":    {dbFile: "multiple_users_and_groups", localGroupsFile: "users_in_groups.group"},
-		"Successfully_delete_user_keeps_other_users_in_shared_group": {username: "user2@example.com", dbFile: "multiple_users_and_groups"},
+		"Successfully_delete_user":                                   {},
+		"Successfully_delete_user_removes_them_from_local_groups":    {localGroupsFile: "users_in_groups.group"},
+		"Successfully_delete_user_keeps_other_users_in_shared_group": {username: "user2@example.com"},
+		"Successfully_delete_user_and_remove_home":                   {removeHome: true},
 
-		"Error_if_user_does_not_exist": {username: "doesnotexist@example.com", dbFile: "multiple_users_and_groups", wantErrType: db.NoDataFoundError{}},
+		"Error_if_user_does_not_exist": {username: "doesnotexist@example.com", wantErrType: db.NoDataFoundError{}},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -824,16 +825,37 @@ func TestDeleteUser(t *testing.T) {
 			}
 
 			dbDir := t.TempDir()
-			err := db.Z_ForTests_CreateDBFromYAML(filepath.Join("testdata", "db", tc.dbFile+".db.yaml"), dbDir)
+			dbFile := "multiple_users_and_groups_with_tmp_home"
+			err := db.Z_ForTests_CreateDBFromYAML(filepath.Join("testdata", "db", dbFile+".db.yaml"), dbDir)
 			require.NoError(t, err, "Setup: could not create database from testdata")
 			m := newManagerForTests(t, dbDir)
 
-			err = m.DeleteUser(tc.username)
+			var userHome string
+			if tc.username != "doesnotexist@example.com" {
+				user, err := m.UserByName(tc.username)
+				require.NoError(t, err, "Setup: could not look up user")
+				userHome = user.Dir
+				if userHome != "" {
+					err = os.MkdirAll(userHome, 0o700)
+					require.NoError(t, err, "Setup: could not create home directory for %s", tc.username)
+				}
+			}
+			// We expect db file to have user home directories under
+			// /tmp/authd-delete-user-test to keep the cleanup logic simple
+			t.Cleanup(func() { _ = os.RemoveAll("/tmp/authd-delete-user-test/") })
+
+			err = m.DeleteUser(tc.username, tc.removeHome)
 			log.Debugf(context.Background(), "DeleteUser error: %v", err)
 
 			requireErrorAssertions(t, err, tc.wantErrType, tc.wantErr)
 			if tc.wantErrType != nil || tc.wantErr {
 				return
+			}
+
+			if tc.removeHome {
+				require.NoDirExists(t, userHome, "Home directory should have been removed")
+			} else {
+				require.DirExists(t, userHome, "Home directory should still exist")
 			}
 
 			got, err := db.Z_ForTests_DumpNormalizedYAML(userstestutils.DBManager(m))
