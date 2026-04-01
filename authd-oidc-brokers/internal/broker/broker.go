@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -155,6 +156,20 @@ func New(cfg Config, args ...Option) (b *Broker, err error) {
 	return b, nil
 }
 
+// NormalizedIssuer converts an issuer URL into a filesystem-safe directory name
+// by stripping the scheme and replacing path/port separators with underscores.
+func NormalizedIssuer(issuerURL string) string {
+	_, issuer, _ := strings.Cut(issuerURL, "://")
+	issuer = strings.ReplaceAll(issuer, "/", "_")
+	issuer = strings.ReplaceAll(issuer, ":", "_")
+	return issuer
+}
+
+// userDataDir returns the path to the broker's data directory for the given user.
+func (b *Broker) userDataDir(username string) string {
+	return filepath.Join(b.cfg.DataDir, NormalizedIssuer(b.cfg.issuerURL), username)
+}
+
 // NewSession creates a new session for the user.
 func (b *Broker) NewSession(username, lang, mode string) (sessionID, encryptionKey string, err error) {
 	defer decorate.OnError(&err, "could not create new session for user %q", username)
@@ -173,10 +188,7 @@ func (b *Broker) NewSession(username, lang, mode string) (sessionID, encryptionK
 		return "", "", err
 	}
 
-	_, issuer, _ := strings.Cut(b.cfg.issuerURL, "://")
-	issuer = strings.ReplaceAll(issuer, "/", "_")
-	issuer = strings.ReplaceAll(issuer, ":", "_")
-	s.userDataDir = filepath.Join(b.cfg.DataDir, issuer, username)
+	s.userDataDir = b.userDataDir(username)
 	// The token is stored in $DATA_DIR/$ISSUER/$USERNAME/token.json.
 	s.tokenPath = filepath.Join(s.userDataDir, "token.json")
 	// The password is stored in $DATA_DIR/$ISSUER/$USERNAME/password.
@@ -1001,6 +1013,18 @@ func (b *Broker) CancelIsAuthenticated(sessionID string) {
 	if err := b.updateSession(sessionID, session); err != nil {
 		log.Errorf(context.Background(), "Error when cancelling IsAuthenticated: %v", err)
 	}
+}
+
+// DeleteUser removes all broker side data stored for the given user
+// from the broker's data directory.
+func (b *Broker) DeleteUser(username string) error {
+	userDataDir := b.userDataDir(username)
+
+	if err := os.RemoveAll(userDataDir); err != nil {
+		return fmt.Errorf("could not remove user data directory %q: %w", userDataDir, err)
+	}
+	log.Infof(context.Background(), "Deleted broker data for user %q at %q", username, userDataDir)
+	return nil
 }
 
 // UserPreCheck checks if the user is valid and can be allowed to authenticate.

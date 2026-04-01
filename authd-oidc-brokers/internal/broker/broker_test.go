@@ -1366,6 +1366,92 @@ func TestUserPreCheck(t *testing.T) {
 	}
 }
 
+func TestUserDataDir(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		issuerURL string
+		username  string
+		want      string
+	}{
+		"HTTP_issuerURL_with_host":           {issuerURL: "http://example.com", username: "user@example.com", want: "example.com/user@example.com"},
+		"HTTPS_issuerURL_with_host":          {issuerURL: "https://example.com", username: "user@example.com", want: "example.com/user@example.com"},
+		"IssuerURL_with_path_separators":     {issuerURL: "https://example.com/tenant/v2.0", username: "user@example.com", want: "example.com_tenant_v2.0/user@example.com"},
+		"IssuerURL_with_port":                {issuerURL: "https://example.com:8080", username: "user@example.com", want: "example.com_8080/user@example.com"},
+		"IssuerURL_with_port_and_path":       {issuerURL: "https://example.com:8080/path", username: "user@example.com", want: "example.com_8080_path/user@example.com"},
+		"IssuerURL_with_IP_address":          {issuerURL: "https://127.0.0.1", username: "user@example.com", want: "127.0.0.1/user@example.com"},
+		"IssuerURL_with_IP_address_and_port": {issuerURL: "https://127.0.0.1:8080", username: "user@example.com", want: "127.0.0.1_8080/user@example.com"},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			b := newBrokerForTests(t, &brokerForTestConfig{
+				issuerURL: tc.issuerURL,
+			})
+
+			got := b.UserDataDir(tc.username)
+			require.Equal(t, filepath.Join(b.DataDir(), tc.want), got, "UserDataDir returned unexpected result")
+		})
+	}
+}
+
+func TestDeleteUser(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		username        string
+		createUserDir   bool
+		readOnlyDataDir bool
+
+		wantErr bool
+	}{
+		"Successfully_delete_existing_user":        {username: "user@example.com", createUserDir: true},
+		"Successfully_delete_unknown_user_is_noop": {username: "unknown@example.com"},
+
+		"Error_when_user_data_dir_cannot_be_removed": {username: "user@example.com", createUserDir: true, readOnlyDataDir: true, wantErr: true},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			b := newBrokerForTests(t, &brokerForTestConfig{
+				issuerURL: defaultIssuerURL,
+			})
+
+			// Derive the path where DeleteUser will look for the user's data
+			userDataDir := b.UserDataDir(tc.username)
+
+			if tc.createUserDir {
+				err := os.MkdirAll(userDataDir, 0700)
+				require.NoError(t, err, "Setup: could not create user data directory")
+
+				// Write a dummy token file so the directory is non-empty
+				err = os.WriteFile(filepath.Join(userDataDir, "token.json"), []byte(`{}`), 0600)
+				require.NoError(t, err, "Setup: could not write dummy token file")
+			}
+
+			if tc.readOnlyDataDir {
+				// Make the issuer directory read-only so RemoveAll fails on the user subdir
+				issuerDir := filepath.Dir(userDataDir)
+				err := os.Chmod(issuerDir, 0500)
+				require.NoError(t, err, "Setup: could not make issuer directory read-only")
+				t.Cleanup(func() { _ = os.Chmod(issuerDir, 0700) })
+			}
+
+			err := b.DeleteUser(tc.username)
+			if tc.wantErr {
+				require.Error(t, err, "DeleteUser should return an error, but did not")
+				return
+			}
+			require.NoError(t, err, "DeleteUser should not return an error, but did")
+
+			// Verify the user data directory no longer exists
+			require.NoDirExists(t, userDataDir, "User data directory should have been removed")
+		})
+	}
+}
+
 func TestMain(m *testing.M) {
 	log.SetLevel(log.DebugLevel)
 
